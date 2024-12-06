@@ -13,17 +13,17 @@ patches-own [
 to setup
   clear-all
   set-default-shape turtles "bug"
-  
+
   ;; Criar formigas
   create-turtles population [
     set size 2         ;; mais visível
     set color red      ;; vermelho = não carregando comida
   ]
-  
+
   ;; Configurar patches
   setup-patches
   setup-obstacles       ;; Adiciona obstáculos
-  
+
   reset-ticks
 end
 
@@ -77,13 +77,13 @@ to go
     wiggle
     move
   ]
-  
+
   diffuse chemical (diffusion-rate / 100)
   ask patches [
     set chemical chemical * (100 - evaporation-rate) / 100
     recolor-patch
   ]
-  
+
   tick
 end
 
@@ -102,7 +102,12 @@ to wiggle
   rt random 40
   lt random 40
   if not can-move? 1 [ rt 180 ]
-  if [pcolor] of patch-ahead 1 = grey [ rt 180 ]  ;; Evita andar para o obstáculo
+  
+  ;; Verificar se a tartaruga está tentando ir para um obstáculo
+  let next-patch patch-ahead 1
+  if next-patch != nobody and [pcolor] of next-patch = grey [
+    rt 180 ;; Se o patch à frente for um obstáculo, vira 180 graus
+  ]
 end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -116,7 +121,10 @@ to return-to-nest
   ] [
     set chemical chemical + 60
     uphill-nest-scent
-    if [pcolor] of patch-ahead 1 = grey [ rt 180 ]  ;; Redireciona caso haja obstáculo
+    let next-patch patch-ahead 1
+    if next-patch != nobody and [pcolor] of next-patch = grey [ 
+      rt 180 ;; Redireciona caso haja obstáculo
+    ]
   ]
 end
 
