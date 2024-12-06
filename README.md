@@ -1,5 +1,3 @@
-# Netlogo-Project-Ants
-adaptation of a system to understanding the role of reative agents in a ant colony
 patches-own [
   chemical             ;; quantidade de feromônio no patch
   food                 ;; quantidade de comida no patch (0, 1 ou 2)
@@ -15,12 +13,17 @@ patches-own [
 to setup
   clear-all
   set-default-shape turtles "bug"
+  
+  ;; Criar formigas
   create-turtles population [
     set size 2         ;; mais visível
     set color red      ;; vermelho = não carregando comida
   ]
+  
+  ;; Configurar patches
   setup-patches
-  setup-obstacles       ;; adiciona obstáculos
+  setup-obstacles       ;; Adiciona obstáculos
+  
   reset-ticks
 end
 
@@ -54,7 +57,7 @@ end
 
 to setup-obstacles
   ask patches [
-    if random 100 < 10 [ ; 10% dos patches serão obstáculos
+    if random 100 < 5 [ ;; 5% dos patches serão obstáculos
       set pcolor grey
     ]
   ]
@@ -66,29 +69,45 @@ end
 
 to go
   ask turtles [
-    if who >= ticks [ stop ]
     ifelse color = red [
       look-for-food
     ] [
       return-to-nest
     ]
     wiggle
-    fd 1
+    move
   ]
+  
   diffuse chemical (diffusion-rate / 100)
   ask patches [
     set chemical chemical * (100 - evaporation-rate) / 100
     recolor-patch
   ]
+  
   tick
 end
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Movement procedures ;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 to move
-  let target-patch one-of patches in-cone 2 30 with [pcolor != grey]  ;; Evita obstáculos
+  let target-patch one-of patches in-cone 2 30 with [pcolor != grey]  ;; Evitar obstáculos
   if target-patch != nobody [
     move-to target-patch
   ]
 end
+
+to wiggle
+  rt random 40
+  lt random 40
+  if not can-move? 1 [ rt 180 ]
+  if [pcolor] of patch-ahead 1 = grey [ rt 180 ]  ;; Evita andar para o obstáculo
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Nest and food procedures ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 to return-to-nest
   ifelse nest? [
@@ -97,6 +116,7 @@ to return-to-nest
   ] [
     set chemical chemical + 60
     uphill-nest-scent
+    if [pcolor] of patch-ahead 1 = grey [ rt 180 ]  ;; Redireciona caso haja obstáculo
   ]
 end
 
@@ -111,7 +131,12 @@ to look-for-food
     uphill-chemical
   ]
 end
-to recolor-patch  ;; patch procedure
+
+;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Helper procedures ;;
+;;;;;;;;;;;;;;;;;;;;;;;;
+
+to recolor-patch
   if pcolor = grey [ stop ]  ;; Não altera a cor dos obstáculos
   ifelse nest? [
     set pcolor violet
@@ -125,7 +150,6 @@ to recolor-patch  ;; patch procedure
     ]
   ]
 end
-
 
 to uphill-chemical
   let scent-ahead chemical-scent-at-angle 0
@@ -153,20 +177,14 @@ to uphill-nest-scent
   ]
 end
 
-to wiggle
-  rt random 40
-  lt random 40
-  if not can-move? 1 [ rt 180 ]
+to-report chemical-scent-at-angle [angle]
+  let p patch-right-and-ahead angle 1
+  if p = nobody [ report 0 ]
+  report [chemical] of p
 end
 
 to-report nest-scent-at-angle [angle]
   let p patch-right-and-ahead angle 1
   if p = nobody [ report 0 ]
   report [nest-scent] of p
-end
-
-to-report chemical-scent-at-angle [angle]
-  let p patch-right-and-ahead angle 1
-  if p = nobody [ report 0 ]
-  report [chemical] of p
 end
