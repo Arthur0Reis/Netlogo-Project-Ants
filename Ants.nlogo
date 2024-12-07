@@ -1,48 +1,59 @@
 breed [anteaters anteater]  ; Define uma raça de predadores
 breed [ants ant]            ; Raça de formigas já existente
+
 globals [
   ant-population
   anteater-population
 ]
+
 patches-own [
-  chemical             ;; amount of chemical on this patch
-  food                 ;; amount of food on this patch (0, 1, or 2)
-  nest?                ;; true on nest patches, false elsewhere
-  nest-scent           ;; number that is higher closer to the nest
-  food-source-number   ;; number (1, 2, or 3) to identify the food sources
+  chemical             ;; quantidade de feromônio neste patch
+  food                 ;; quantidade de comida neste patch (0, 1 ou 2)
+  nest?                ;; verdadeiro se for um patch do ninho
+  nest-scent           ;; número mais alto próximo ao ninho
+  food-source-number   ;; número (1, 2 ou 3) para identificar as fontes de comida
 ]
 
-;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;; ;
 ;;; Setup procedures ;;;
-;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;; ;
 
 to setup
-
   clear-all
+  create-obstacles
   set-default-shape ants "bug"
   set-default-shape anteaters "cow"
-  create-ants 10
-  [ set size 2         ;; easier to see
-    set color red  ]   ;; red = not carrying food
+  create-ants 40
+  [ set size 2         ;; mais visível
+    set color red  ]   ;; vermelho = não carregando comida
 
-create-anteaters 4 [
+  create-anteaters 2 [
     set size 8
     set heading random 360
+    setxy random-xcor random-ycor
   ]
 
   setup-patches
   reset-ticks
 end
 
-
-
-to setup-patches
-  ask patches
-  [ setup-nest
-    setup-food
-    recolor-patch ]
+to create-obstacles
+  ; Vamos preencher algumas áreas do mundo com obstáculos
+  ask patches [
+    if random 100 < 3 [  ;; 10% chance de ser um obstáculo (diminuiu de 30% para 10%)
+      set pcolor white  ;; Torna o patch branco, simbolizando um obstáculo
+    ]
+  ]
 end
 
+to setup-patches
+  ;; Primeiramente, cria o ninho e a comida
+  ask patches [
+    setup-nest
+    setup-food
+    recolor-patch
+  ]
+end
 
 to setup-nest  ;; patch procedure
   ;; set nest? variable to true inside the nest, false elsewhere
@@ -67,37 +78,51 @@ to setup-food  ;; patch procedure
 end
 
 to recolor-patch  ;; patch procedure
-  ;; give color to nest and food sources
-  ifelse nest?
-  [ set pcolor violet ]
-  [ ifelse food > 0
-    [ if food-source-number = 1 [ set pcolor cyan ]
-      if food-source-number = 2 [ set pcolor sky  ]
-      if food-source-number = 3 [ set pcolor blue ] ]
-    ;; scale color to show chemical concentration
-    [ set pcolor scale-color green chemical 0.1 5 ] ]
+  ;; Verifica se o patch é um obstáculo
+  if pcolor = white [ ;; Se o patch for um obstáculo (cor branca)
+    stop  ;; Não faz nada e sai do procedimento
+  ]
+
+  ;; Caso contrário, dá cor ao ninho e às fontes de comida
+  ifelse nest? [
+    set pcolor violet
+  ] [
+    ifelse food > 0 [
+      if food-source-number = 1 [ set pcolor cyan ]
+      if food-source-number = 2 [ set pcolor sky ]
+      if food-source-number = 3 [ set pcolor blue ]
+    ] [
+      ;; escala de cor para mostrar a concentração de feromônio
+      set pcolor scale-color green chemical 0.1 5
+    ]
+  ]
 end
 
 ;;;;;;;;;;;;;;;;;;;;;
 ;;; Go procedures ;;;
 ;;;;;;;;;;;;;;;;;;;;;
 
-to go  ;; forever button
-  ask ants
-  [ if who >= ticks [ stop ] ;; delay initial departure
-    ifelse color = red
-    [ look-for-food  ]       ;; not carrying food? look for it
-    [ return-to-nest ]       ;; carrying food? take it back to nest
+to go  ;; procedimento principal
+  ask ants [
+    ifelse color = red [ look-for-food ] [ return-to-nest ] ;; Lógica de busca de comida ou retorno ao ninho
     wiggle
-    fd 1 ]
-  diffuse chemical (diffusion-rate / 100)
-  ask patches
-  [ set chemical chemical * (100 - evaporation-rate) / 100  ;; slowly evaporate chemical
-    recolor-patch ]
+    move-avoid-obstacles  ;; Movimenta-se evitando obstáculos
+    fd 1
+  ]
 
- ask anteaters
-  [chase-mcants catch-ant]
- tick
+  ask anteaters [
+    chase-mcants
+    catch-ant  ;; Predadores tentam caçar formigas
+    move-avoid-obstacles  ;; Movimenta-se evitando obstáculos
+  ]
+
+  diffuse chemical (diffusion-rate / 100)
+  ask patches [
+    set chemical chemical * (100 - evaporation-rate) / 100  ;; Evaporação do feromônio
+    recolor-patch
+  ]
+
+  tick
 end
 
 to catch-ant
@@ -106,7 +131,6 @@ to catch-ant
     ask target-ant [ die ]
   ]
 end
-
 
 to chase-mcants
   let target-ant one-of ants in-radius 2  ;; Encontra uma formiga dentro de um raio de 10
@@ -136,9 +160,7 @@ to look-for-food  ;; turtle procedure
   [ uphill-chemical ]
 end
 
-
-
-;; sniff left and right, and go where the strongest smell is
+;; Sniff left and right, and go where the strongest smell is
 to uphill-chemical  ;; turtle procedure
   let scent-ahead chemical-scent-at-angle   0
   let scent-right chemical-scent-at-angle  45
@@ -149,7 +171,7 @@ to uphill-chemical  ;; turtle procedure
     [ lt 45 ] ]
 end
 
-;; sniff left and right, and go where the strongest smell is
+;; Sniff left and right, and go where the strongest smell is
 to uphill-nest-scent  ;; turtle procedure
   let scent-ahead nest-scent-at-angle   0
   let scent-right nest-scent-at-angle  45
@@ -166,6 +188,18 @@ to wiggle  ;; turtle procedure
   if not can-move? 1 [ rt 180 ]
 end
 
+to move-avoid-obstacles  ;; Procedimento para mover evitando obstáculos
+  let ahead-patch patch-ahead 1
+  ;; Verifica se o patch à frente existe (não é "nobody")
+  if ahead-patch != nobody [
+    if [pcolor] of ahead-patch = white [  ;; Se o patch à frente for um obstáculo (cor branca)
+      rt 180  ;; Gira 180 graus
+    ]
+    fd 1  ;; Move-se para frente
+  ]
+end
+
+
 to-report nest-scent-at-angle [angle]
   let p patch-right-and-ahead angle 1
   if p = nobody [ report 0 ]
@@ -177,10 +211,6 @@ to-report chemical-scent-at-angle [angle]
   if p = nobody [ report 0 ]
   report [chemical] of p
 end
-
-
-; Copyright 1997 Uri Wilensky.
-; See Info tab for full copyright and license.
 @#$#@#$#@
 GRAPHICS-WINDOW
 257
@@ -282,7 +312,7 @@ population
 population
 0.0
 200.0
-200.0
+134.0
 1.0
 1
 NIL
