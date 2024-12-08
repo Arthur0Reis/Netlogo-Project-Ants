@@ -1,53 +1,49 @@
-breed [anteaters anteater]  ; Define uma raça de predadores
-breed [ants ant]            ; Raça de formigas já existente
+breed [ants ant]         ;; Raça de formigas
+breed [anteaters anteater] ;; Raça de tamanduás
 
-globals [
-  ant-population
-  anteater-population
+turtles-own [
+  is-predator?    ;; True se for predador, falso para formiga
 ]
 
 patches-own [
-  chemical             ;; quantidade de feromônio neste patch
-  food                 ;; quantidade de comida neste patch (0, 1 ou 2)
-  nest?                ;; verdadeiro se for um patch do ninho
-  nest-scent           ;; número mais alto próximo ao ninho
-  food-source-number   ;; número (1, 2 ou 3) para identificar as fontes de comida
+  chemical             ;; Quantidade de feromônio no patch
+  food                 ;; Quantidade de comida no patch (0, 1 ou 2)
+  nest?                ;; Verdadeiro para patches do ninho, falso para outros
+  nest-scent           ;; Valor mais alto próximo ao ninho
+  food-source-number   ;; Número (1, 2 ou 3) para identificar as fontes de comida
 ]
 
-;;;;;;;;;;;;;;;;;;;;;;; ;
+;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Setup procedures ;;;
-;;;;;;;;;;;;;;;;;;;;;;; ;
+;;;;;;;;;;;;;;;;;;;;;;;
 
 to setup
   clear-all
-  create-obstacles
-  set-default-shape ants "bug"
-  set-default-shape anteaters "cow"
-  create-ants 40
-  [ set size 2         ;; mais visível
-    set color red  ]   ;; vermelho = não carregando comida
+  set-default-shape ants "bug"           ;; Forma das formigas
+  set-default-shape anteaters "cow"      ;; Forma dos tamanduás
 
-  create-anteaters 2 [
-    set size 8
-    set heading random 360
-    setxy random-xcor random-ycor
+  ;; Criar formigas
+  create-ants population [
+    set size 2         ;; Mais visível
+    set color red      ;; Vermelho = não carregando comida
+    set is-predator? false
   ]
 
+  ;; Criar tamanduás
+  create-anteaters 2 [
+    set size 5         ;; Tamanho maior para tamanduás
+    set color yellow    ;; Cor preta para tamanduás
+    set is-predator? true
+  ]
+
+  ;; Configurar patches
   setup-patches
+  setup-obstacles  ;; Adiciona obstáculos
+
   reset-ticks
 end
 
-to create-obstacles
-  ; Vamos preencher algumas áreas do mundo com obstáculos
-  ask patches [
-    if random 100 < 3 [  ;; 10% chance de ser um obstáculo (diminuiu de 30% para 10%)
-      set pcolor white  ;; Torna o patch branco, simbolizando um obstáculo
-    ]
-  ]
-end
-
 to setup-patches
-  ;; Primeiramente, cria o ninho e a comida
   ask patches [
     setup-nest
     setup-food
@@ -56,44 +52,29 @@ to setup-patches
 end
 
 to setup-nest  ;; patch procedure
-  ;; set nest? variable to true inside the nest, false elsewhere
   set nest? (distancexy 0 0) < 5
-  ;; spread a nest-scent over the whole world -- stronger near the nest
   set nest-scent 200 - distancexy 0 0
 end
 
 to setup-food  ;; patch procedure
-  ;; setup food source one on the right
-  if (distancexy (0.6 * max-pxcor) 0) < 5
-  [ set food-source-number 1 ]
-  ;; setup food source two on the lower-left
-  if (distancexy (-0.6 * max-pxcor) (-0.6 * max-pycor)) < 5
-  [ set food-source-number 2 ]
-  ;; setup food source three on the upper-left
-  if (distancexy (-0.8 * max-pxcor) (0.8 * max-pycor)) < 5
-  [ set food-source-number 3 ]
-  ;; set "food" at sources to either 1 or 2, randomly
-  if food-source-number > 0
-  [ set food one-of [1 2] ]
+  if (distancexy (0.6 * max-pxcor) 0) < 5 [
+    set food-source-number 1
+  ]
+  if (distancexy (-0.6 * max-pxcor) (-0.6 * max-pycor)) < 5 [
+    set food-source-number 2
+  ]
+  if (distancexy (-0.8 * max-pxcor) (0.8 * max-pycor)) < 5 [
+    set food-source-number 3
+  ]
+  if food-source-number > 0 [
+    set food one-of [1 2]
+  ]
 end
 
-to recolor-patch  ;; patch procedure
-  ;; Verifica se o patch é um obstáculo
-  if pcolor = white [ ;; Se o patch for um obstáculo (cor branca)
-    stop  ;; Não faz nada e sai do procedimento
-  ]
-
-  ;; Caso contrário, dá cor ao ninho e às fontes de comida
-  ifelse nest? [
-    set pcolor violet
-  ] [
-    ifelse food > 0 [
-      if food-source-number = 1 [ set pcolor cyan ]
-      if food-source-number = 2 [ set pcolor sky ]
-      if food-source-number = 3 [ set pcolor blue ]
-    ] [
-      ;; escala de cor para mostrar a concentração de feromônio
-      set pcolor scale-color green chemical 0.1 5
+to setup-obstacles
+  ask patches [
+    if random 100 < 5 [ ;; 5% dos patches serão obstáculos
+      set pcolor grey    ;; Define a cor dos obstáculos
     ]
   ]
 end
@@ -102,114 +83,165 @@ end
 ;;; Go procedures ;;;
 ;;;;;;;;;;;;;;;;;;;;;
 
-to go  ;; procedimento principal
+to go
+  ;; Formigas realizam suas tarefas
   ask ants [
-    ifelse color = red [ look-for-food ] [ return-to-nest ] ;; Lógica de busca de comida ou retorno ao ninho
+    ifelse color = red [
+      look-for-food
+    ] [
+      return-to-nest
+    ]
     wiggle
-    move-avoid-obstacles  ;; Movimenta-se evitando obstáculos
-    fd 1
+    move
   ]
 
+  ;; Predadores caçam formigas
   ask anteaters [
-    chase-mcants
-    catch-ant  ;; Predadores tentam caçar formigas
-    move-avoid-obstacles  ;; Movimenta-se evitando obstáculos
+    hunt
   ]
 
+  ;; Difusão e evaporação do feromônio
   diffuse chemical (diffusion-rate / 100)
   ask patches [
-    set chemical chemical * (100 - evaporation-rate) / 100  ;; Evaporação do feromônio
+    set chemical chemical * (100 - evaporation-rate) / 100
     recolor-patch
   ]
 
   tick
 end
 
-to catch-ant
-   let target-ant one-of ants in-radius 1  ;; Se uma formiga estiver dentro de um raio de 1, o predador a captura
-  if target-ant != nobody [
-    ask target-ant [ die ]
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Movement procedures ;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to move
+  let target-patch one-of patches in-cone 2 30 with [pcolor != grey]  ;; Evitar obstáculos
+  if target-patch != nobody [
+    move-to target-patch
   ]
 end
 
-to chase-mcants
-  let target-ant one-of ants in-radius 2  ;; Encontra uma formiga dentro de um raio de 10
-  if target-ant != nobody [
-    face target-ant  ;; Gira em direção à formiga
-    forward 2  ;; Move-se em direção à formiga
-  ]
-end
-
-to return-to-nest  ;; turtle procedure
-  ifelse nest?
-  [ ;; drop food and head out again
-    set color red
-    rt 180 ]
-  [ set chemical chemical + 60  ;; drop some chemical
-    uphill-nest-scent ]         ;; head toward the greatest value of nest-scent
-end
-
-to look-for-food  ;; turtle procedure
-  if food > 0
-  [ set color orange + 1     ;; pick up food
-    set food food - 1        ;; and reduce the food source
-    rt 180                   ;; and turn around
-    stop ]
-  ;; go in the direction where the chemical smell is strongest
-  if (chemical >= 0.05) and (chemical < 2)
-  [ uphill-chemical ]
-end
-
-;; Sniff left and right, and go where the strongest smell is
-to uphill-chemical  ;; turtle procedure
-  let scent-ahead chemical-scent-at-angle   0
-  let scent-right chemical-scent-at-angle  45
-  let scent-left  chemical-scent-at-angle -45
-  if (scent-right > scent-ahead) or (scent-left > scent-ahead)
-  [ ifelse scent-right > scent-left
-    [ rt 45 ]
-    [ lt 45 ] ]
-end
-
-;; Sniff left and right, and go where the strongest smell is
-to uphill-nest-scent  ;; turtle procedure
-  let scent-ahead nest-scent-at-angle   0
-  let scent-right nest-scent-at-angle  45
-  let scent-left  nest-scent-at-angle -45
-  if (scent-right > scent-ahead) or (scent-left > scent-ahead)
-  [ ifelse scent-right > scent-left
-    [ rt 45 ]
-    [ lt 45 ] ]
-end
-
-to wiggle  ;; turtle procedure
+to wiggle
   rt random 40
   lt random 40
   if not can-move? 1 [ rt 180 ]
-end
 
-to move-avoid-obstacles  ;; Procedimento para mover evitando obstáculos
-  let ahead-patch patch-ahead 1
-  ;; Verifica se o patch à frente existe (não é "nobody")
-  if ahead-patch != nobody [
-    if [pcolor] of ahead-patch = white [  ;; Se o patch à frente for um obstáculo (cor branca)
-      rt 180  ;; Gira 180 graus
-    ]
-    fd 1  ;; Move-se para frente
+  ;; Verificar se a tartaruga está tentando ir para um obstáculo
+  let next-patch patch-ahead 1
+  if next-patch != nobody and [pcolor] of next-patch = grey [
+    rt 180 ;; Se o patch à frente for um obstáculo, vira 180 graus
   ]
 end
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Nest and food procedures ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-to-report nest-scent-at-angle [angle]
-  let p patch-right-and-ahead angle 1
-  if p = nobody [ report 0 ]
-  report [nest-scent] of p
+to return-to-nest
+  ifelse nest? [
+    set color red
+    rt 180
+  ] [
+    set chemical chemical + 60
+    uphill-nest-scent
+    let next-patch patch-ahead 1
+    if next-patch != nobody and [pcolor] of next-patch = grey [
+      rt 180 ;; Redireciona caso haja obstáculo
+    ]
+  ]
+end
+
+to look-for-food
+  if food > 0 [
+    set color orange + 1
+    set food food - 1
+    rt 180
+    stop
+  ]
+  if (chemical >= 0.05) and (chemical < 2) [
+    uphill-chemical
+  ]
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Predator behavior ;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to hunt
+  ;; Tentar encontrar uma formiga
+  let prey one-of ants in-radius 1  ;; Forma mais eficiente de encontrar formiga
+  if prey != nobody [
+    face prey
+    move-to prey
+    ;; Tentativa de capturar a formiga
+    if distance prey < 1 [
+      if random 100 < 5 [ ;; Apenas 5% de chance de capturar
+        ask prey [ die ]  ;; Remove a formiga do ambiente
+      ]
+    ]
+  ]
+  ;; Se não encontrar formigas, move-se aleatoriamente
+  if prey = nobody [
+    wiggle
+    move
+  ]
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Helper procedures ;;
+;;;;;;;;;;;;;;;;;;;;;;;;
+
+to recolor-patch
+  if pcolor = grey [ stop ]  ;; Não altera a cor dos obstáculos
+  ifelse nest? [
+    set pcolor violet
+  ] [
+    ifelse food > 0 [
+      if food-source-number = 1 [ set pcolor cyan ]
+      if food-source-number = 2 [ set pcolor sky ]
+      if food-source-number = 3 [ set pcolor blue ]
+    ] [
+      set pcolor scale-color green chemical 0.1 5
+    ]
+  ]
+end
+
+to uphill-chemical
+  let scent-ahead chemical-scent-at-angle 0
+  let scent-right chemical-scent-at-angle 45
+  let scent-left chemical-scent-at-angle -45
+  if (scent-right > scent-ahead) or (scent-left > scent-ahead) [
+    ifelse scent-right > scent-left [
+      rt 45
+    ] [
+      lt 45
+    ]
+  ]
+end
+
+to uphill-nest-scent
+  let scent-ahead nest-scent-at-angle 0
+  let scent-right nest-scent-at-angle 45
+  let scent-left nest-scent-at-angle -45
+  if (scent-right > scent-ahead) or (scent-left > scent-ahead) [
+    ifelse scent-right > scent-left [
+      rt 45
+    ] [
+      lt 45
+    ]
+  ]
 end
 
 to-report chemical-scent-at-angle [angle]
   let p patch-right-and-ahead angle 1
   if p = nobody [ report 0 ]
   report [chemical] of p
+end
+
+to-report nest-scent-at-angle [angle]
+  let p patch-right-and-ahead angle 1
+  if p = nobody [ report 0 ]
+  report [nest-scent] of p
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -312,7 +344,7 @@ population
 population
 0.0
 200.0
-134.0
+200.0
 1.0
 1
 NIL
