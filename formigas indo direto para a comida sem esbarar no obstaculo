@@ -12,7 +12,7 @@ patches-own [
 
 to setup
   clear-all
-  set-default-shape turtles "bug"  ;; Forma padrão das formigas
+  set-default-shape turtles "bug"
 
   ;; Criar formigas
   create-turtles population [
@@ -74,9 +74,7 @@ to go
     ] [
       return-to-nest
     ]
-    if not can-move? 1 [
-      reorient
-    ]
+    reorient-if-needed
     fd 1
   ]
 
@@ -93,12 +91,19 @@ end
 ;;; Reorientation procedure ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+to reorient-if-needed
+  let next-patch patch-ahead 1
+  if next-patch = nobody or [pcolor] of next-patch = grey [
+    reorient
+  ]
+end
+
 to reorient
-  ;; Se não puder se mover, tenta redefinir direção
-  let random-angle one-of [45 90 135 180 225 270 315]
-  rt random-angle
+  let directions [0 90 180 270] ;; Direções: direita, cima, esquerda, baixo
+  let new-direction one-of directions
+  set heading new-direction
   if not can-move? 1 [
-    lt random-angle ;; Se ainda não conseguir se mover, tenta em outra direção
+    reorient  ;; Recursivamente tenta encontrar uma nova direção
   ]
 end
 
