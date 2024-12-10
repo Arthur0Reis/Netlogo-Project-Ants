@@ -1,3 +1,7 @@
+;; Definição das raças
+breed [formigas formiga]  ;; "formigas" é o nome da raça e "formiga" é o nome do tipo de agente
+breed [predadores predador] ;; "predadores" é o nome da raça e "predador" é o nome do tipo de agente
+
 patches-own [
   chemical             ;; quantidade de feromônio no patch
   food                 ;; quantidade de comida no patch (0, 1 ou 2)
@@ -6,27 +10,29 @@ patches-own [
   food-source-number   ;; número (1, 2 ou 3) para identificar as fontes de comida
 ]
 
-turtles-own [
+formigas-own [
   is-predator?    ;; Indica se é um predador (true) ou uma formiga (false)
 ]
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
+
 ;;; Setup procedures ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;
 
 to setup
   clear-all
-  set-default-shape turtles "bug"
+  set-default-shape formigas "bug" ;; Forma para formigas
+  set-default-shape predadores "bug" ;; Forma para predadores
 
   ;; Criar formigas
-  create-turtles population [
+  create-formigas population [
     set size 2         ;; Mais visível
     set color red      ;; Cor vermelha = não carregando comida
     set is-predator? false
   ]
 
   ;; Criar predador
-  create-turtles 1 [
+  create-predadores 1 [
     set size 3         ;; Maior que as formigas
     set color green    ;; Predador será verde
     set is-predator? true
@@ -81,7 +87,7 @@ end
 
 to go
   ;; Formigas realizam suas tarefas
-  ask turtles with [is-predator? = false] [
+  ask formigas with [is-predator? = false] [
     ifelse color = red [
       look-for-food
     ] [
@@ -92,7 +98,7 @@ to go
   ]
 
   ;; Predador caça formigas
-  ask turtles with [is-predator? = true] [
+  ask predadores [
     hunt
     avoid-obstacles
     fd 0.5
@@ -108,9 +114,9 @@ to go
   tick
 end
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Movement adjustments ;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;
 
 to avoid-obstacles
   let next-patch patch-ahead 1
@@ -149,12 +155,8 @@ end
 ;;; Predador Actions ;;;
 ;;;;;;;;;;;;;;;;;;;;;;
 
-;;;;;;;;;;;;;;;;;;;;;;
-;;; Predador Actions ;;;
-;;;;;;;;;;;;;;;;;;;;;;
-
 to hunt
-  let target one-of turtles with [is-predator? = false]  ;; Seleciona uma formiga aleatória
+  let target one-of formigas with [is-predator? = false]  ;; Seleciona uma formiga aleatória
   if target != nobody [
     face target
     move-to target
@@ -171,9 +173,9 @@ to hunt
   ]
 end
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Helper procedures ;;
+
+;;; Helper procedures ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;
 
 to recolor-patch
@@ -221,6 +223,12 @@ to-report chemical-scent-at-angle [angle]
   let p patch-right-and-ahead angle 1
   if p = nobody [ report 0 ]
   report [chemical] of p
+end
+
+to-report nest-scent-at-angle [angle]
+  let p patch-right-and-ahead angle 1
+  if p = nobody [ report 0 ]
+  report [nest-scent] of p
 end
 
 to-report nest-scent-at-angle [angle]
